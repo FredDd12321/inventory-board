@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="zh-CN">
 <head>
@@ -78,7 +79,7 @@
   .badge-caution { background: #fff9e6; color: #b8860b; }
   .badge-gap { background: #f3e5f5; color: #7b1fa2; }
 
-  .sku-name { font-size: 14px; font-weight: 600; font-family: monospace; flex: 1; }
+  .sku-name { font-size: 14px; font-weight: 600; font-family: monospace; margin-right: 6px; }
   .copy-btn { font-size: 11px; padding: 2px 8px; border: 1px solid var(--border); border-radius: 6px;
               background: #f5f6fa; color: var(--muted); cursor: pointer; transition: all .15s;
               white-space: nowrap; user-select: none; }
@@ -343,7 +344,7 @@ function renderCard(item, idx) {
     <div class="sku-header" onclick="document.getElementById('card-${idx}').classList.toggle('open')">
       ${allBadges}
       <span class="sku-name">${item.sku}</span>
-      <button class="copy-btn" id="copy-${idx}" onclick="event.stopPropagation();copySku('${item.sku.replace(/'/g,"\\'")}','copy-${idx}')">复制</button>
+      <button class="copy-btn" id="copy-${idx}" onclick="event.stopPropagation();copySku('${item.sku.replace(/'/g,"\\'")}','copy-${idx}')">复制SKU</button>
       <span class="sku-store">${item.store}</span>
       ${item.staff ? `<span style="font-size:12px;color:var(--muted)">${item.staff}</span>` : ''}
       ${ti ? `<span style="font-size:12px">${ti}</span>` : ''}
@@ -392,7 +393,7 @@ function copySku(sku, btnId) {
     if (!btn) return;
     btn.textContent = '已复制✓';
     btn.classList.add('copied');
-    setTimeout(() => { btn.textContent = '复制'; btn.classList.remove('copied'); }, 1500);
+    setTimeout(() => { btn.textContent = '复制SKU'; btn.classList.remove('copied'); }, 1500);
   }).catch(() => {
     // 兼容无剪贴板权限环境
     const ta = document.createElement('textarea');
@@ -401,7 +402,7 @@ function copySku(sku, btnId) {
     try { document.execCommand('copy'); } catch(e) {}
     document.body.removeChild(ta);
     const btn = document.getElementById(btnId);
-    if (btn) { btn.textContent = '已复制✓'; btn.classList.add('copied'); setTimeout(()=>{ btn.textContent='复制'; btn.classList.remove('copied'); },1500); }
+    if (btn) { btn.textContent = '已复制✓'; btn.classList.add('copied'); setTimeout(()=>{ btn.textContent='复制SKU'; btn.classList.remove('copied'); },1500); }
   });
 }
 
