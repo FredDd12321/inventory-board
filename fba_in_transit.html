@@ -1,0 +1,447 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FBA 紧急备货看板</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --red: #e53935;
+    --orange: #f4511e;
+    --yellow: #f9a825;
+    --green: #43a047;
+    --blue: #1976d2;
+    --bg: #f5f6fa;
+    --card: #fff;
+    --border: #e0e4ef;
+    --text: #2d2d3a;
+    --muted: #7b8099;
+    --accent: #1976d2;
+  }
+  body { font-family: 'PingFang SC','Hiragino Sans GB','Microsoft YaHei',sans-serif;
+         background: var(--bg); color: var(--text); font-size: 14px; }
+
+  .header { background: linear-gradient(135deg,#1565c0 0%,#1976d2 60%,#42a5f5 100%);
+            color: #fff; padding: 20px 28px 16px; display: flex; align-items: center;
+            gap: 16px; box-shadow: 0 2px 8px rgba(25,118,210,.3); }
+  .header-icon { font-size: 32px; }
+  .header-title { font-size: 20px; font-weight: 700; letter-spacing: .5px; }
+  .header-sub { font-size: 12px; opacity: .85; margin-top: 2px; }
+  .header-right { margin-left: auto; text-align: right; font-size: 12px; opacity: .85; }
+
+  .stats-bar { display: flex; gap: 12px; padding: 16px 24px; flex-wrap: wrap; }
+  .stat-card { background: var(--card); border-radius: 10px; padding: 12px 20px;
+               border: 1px solid var(--border); min-width: 120px; text-align: center;
+               box-shadow: 0 1px 4px rgba(0,0,0,.06); cursor: pointer; user-select: none;
+               transition: all .2s; }
+  .stat-card:hover { box-shadow: 0 2px 12px rgba(0,0,0,.12); transform: translateY(-1px); }
+  .stat-card.active { border-color: var(--accent); background: #e3f2fd; box-shadow: 0 2px 12px rgba(25,118,210,.2); }
+  .stat-card .num { font-size: 28px; font-weight: 700; line-height: 1; }
+  .stat-card .lbl { font-size: 11px; color: var(--muted); margin-top: 4px; }
+  .stat-card.red .num { color: var(--red); }
+  .stat-card.orange .num { color: var(--orange); }
+  .stat-card.blue .num { color: var(--blue); }
+  .stat-card.green .num { color: var(--green); }
+  .stat-card.yellow .num { color: #b8860b; }
+  .stat-card.purple .num { color: #7b1fa2; }
+
+  .controls { display: flex; gap: 10px; padding: 0 24px 16px; flex-wrap: wrap; align-items: center; }
+  .controls input, .controls select {
+    padding: 8px 12px; border: 1px solid var(--border); border-radius: 8px;
+    font-size: 13px; background: var(--card); color: var(--text); outline: none;
+    transition: border-color .2s; min-width: 160px;
+  }
+  .controls input:focus, .controls select:focus { border-color: var(--accent); }
+  .sort-btn { padding: 8px 14px; border: 1px solid var(--border); border-radius: 8px;
+              background: var(--card); cursor: pointer; font-size: 13px; color: var(--muted);
+              transition: all .2s; white-space: nowrap; }
+  .sort-btn.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+  .controls-label { font-size: 12px; color: var(--muted); margin-right: -4px; }
+
+  .sku-list { padding: 0 24px 32px; display: flex; flex-direction: column; gap: 12px; }
+  .sku-card { background: var(--card); border-radius: 12px; border: 1px solid var(--border);
+              overflow: hidden; box-shadow: 0 1px 6px rgba(0,0,0,.06);
+              transition: box-shadow .2s; }
+  .sku-card:hover { box-shadow: 0 4px 16px rgba(0,0,0,.1); }
+  .sku-card.urgent { border-left: 4px solid var(--red); }
+  .sku-card.warning { border-left: 4px solid var(--orange); }
+  .sku-card.caution { border-left: 4px solid var(--yellow); }
+
+  .sku-header { display: flex; align-items: center; gap: 12px; padding: 14px 18px;
+                cursor: pointer; user-select: none; }
+  .sku-header:hover { background: #f8f9fd; }
+  .sku-badge { font-size: 10px; font-weight: 700; padding: 3px 8px; border-radius: 20px;
+               text-transform: uppercase; letter-spacing: .5px; white-space: nowrap; }
+  .badge-urgent { background: #fde8e8; color: var(--red); }
+  .badge-warning { background: #fde9d9; color: var(--orange); }
+  .badge-caution { background: #fff9e6; color: #b8860b; }
+  .badge-gap { background: #f3e5f5; color: #7b1fa2; }
+
+  .sku-name { font-size: 14px; font-weight: 600; font-family: monospace; flex: 1; }
+  .copy-btn { font-size: 11px; padding: 2px 8px; border: 1px solid var(--border); border-radius: 6px;
+              background: #f5f6fa; color: var(--muted); cursor: pointer; transition: all .15s;
+              white-space: nowrap; user-select: none; }
+  .copy-btn:hover { background: #e3f2fd; color: var(--accent); border-color: #90caf9; }
+  .copy-btn.copied { background: #e8f5e9; color: #2e7d32; border-color: #a5d6a7; }
+  .sku-store { font-size: 12px; color: var(--muted); background: #f0f2fa;
+               padding: 2px 8px; border-radius: 10px; white-space: nowrap; }
+  .sku-trend { font-size: 12px; }
+  .trend-up { color: var(--red); }
+  .trend-down { color: var(--green); }
+
+  .sku-meta { display: flex; gap: 24px; padding: 0 18px 12px; flex-wrap: wrap; }
+  .meta-item { display: flex; flex-direction: column; min-width: 80px; }
+  .meta-lbl { font-size: 10px; color: var(--muted); margin-bottom: 2px; }
+  .meta-val { font-size: 14px; font-weight: 600; }
+  .meta-val.danger { color: var(--red); }
+  .meta-val.warn { color: var(--orange); }
+  .meta-val.ok { color: var(--green); }
+
+  .expand-arrow { font-size: 14px; color: var(--muted); transition: transform .2s; margin-left: auto; }
+  .sku-card.open .expand-arrow { transform: rotate(180deg); }
+
+  .shipment-detail { display: none; border-top: 1px solid var(--border); padding: 16px 18px; }
+  .sku-card.open .shipment-detail { display: block; }
+  .detail-title { font-size: 12px; font-weight: 700; color: var(--muted); text-transform: uppercase;
+                  letter-spacing: .8px; margin-bottom: 12px; }
+
+  .shipment-table { width: 100%; border-collapse: collapse; font-size: 13px; margin-bottom: 16px; }
+  .shipment-table th { background: #f5f7fb; padding: 8px 12px; text-align: left;
+                       font-size: 11px; color: var(--muted); font-weight: 600;
+                       text-transform: uppercase; letter-spacing: .5px; }
+  .shipment-table td { padding: 9px 12px; border-bottom: 1px solid #f0f2fa; }
+  .shipment-table tr:last-child td { border-bottom: none; }
+  .shipment-table tr:hover td { background: #fafbff; }
+
+  .rank-badge { display: inline-flex; align-items: center; justify-content: center;
+                width: 20px; height: 20px; border-radius: 50%; font-size: 11px;
+                font-weight: 700; margin-right: 6px; }
+  .rank-1 { background: #fff3cd; color: #856404; }
+  .rank-2 { background: #e8eaf6; color: #3949ab; }
+  .rank-3 { background: #fce4ec; color: #c62828; }
+
+  .status-chip { font-size: 10px; padding: 2px 7px; border-radius: 10px; font-weight: 600; }
+  .status-IN_TRANSIT { background: #e3f2fd; color: #1565c0; }
+  .status-SHIPPED { background: #e8f5e9; color: #2e7d32; }
+  .status-RECEIVING { background: #f3e5f5; color: #7b1fa2; }
+  .status-READY_TO_SHIP { background: #e8f5e9; color: #1b5e20; }
+  .receiving-section { background: #fdf8ff; border: 1px solid #e8d5f5; border-radius: 8px; padding: 12px 14px; margin-top: 12px; }
+  .receiving-section .detail-title { color: #7b1fa2; margin-bottom: 8px; }
+  .receiving-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+  .receiving-table th { background: #faf0fc; padding: 6px 10px; text-align: left; font-size: 10px; color: var(--muted); font-weight: 600; }
+  .receiving-table td { padding: 7px 10px; border-bottom: 1px solid #f0e6f5; }
+  .receiving-table tr:last-child td { border-bottom: none; }
+  .receiving-summary { margin-top: 8px; font-size: 12px; color: #7b1fa2; }
+  .ready-section { background: #f1f8e9; border: 1px solid #c5e1a5; border-radius: 8px; padding: 12px 14px; margin-top: 12px; }
+  .ready-section .detail-title { color: #33691e; margin-bottom: 8px; }
+  .ready-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+  .ready-table th { background: #f9fbe7; padding: 6px 10px; text-align: left; font-size: 10px; color: var(--muted); font-weight: 600; }
+  .ready-table td { padding: 7px 10px; border-bottom: 1px solid #dcedc8; }
+  .ready-table tr:last-child td { border-bottom: none; }
+  .ready-summary { margin-top: 8px; font-size: 12px; color: #33691e; }
+
+  .arrival-date { font-weight: 600; }
+  .arrival-soon { color: var(--red); }
+  .arrival-mid  { color: var(--orange); }
+  .arrival-far  { color: var(--muted); }
+  .arrival-na   { color: #bbb; font-style: italic; }
+  .logistics-status-text { font-size: 12px; color: #555; max-width: 200px; display: inline-block; }
+
+  .transit-summary { display: flex; gap: 20px; padding: 10px 14px; background: #f8f9fd;
+                     border-radius: 8px; font-size: 12px; flex-wrap: wrap; }
+  .transit-summary span { color: var(--muted); }
+  .transit-summary strong { color: var(--text); }
+  .no-transit { color: var(--muted); font-style: italic; font-size: 13px; padding: 8px 0; }
+
+  .empty-state { text-align: center; padding: 60px 20px; color: var(--muted); }
+  .empty-state .emoji { font-size: 48px; margin-bottom: 12px; }
+
+  @media (max-width: 600px) {
+    .header { padding: 16px; }
+    .stats-bar, .controls, .sku-list { padding-left: 12px; padding-right: 12px; }
+    .sku-meta { gap: 14px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="header-icon">🚚</div>
+  <div>
+    <div class="header-title">FBA 紧急备货看板</div>
+    <div class="header-sub">在途货件最快到达分析 · 可售天数预警</div>
+  </div>
+  <div class="header-right">
+    <div id="today-date"></div>
+    <div style="margin-top:2px">数据来源：FBA货件汇总表</div>
+  </div>
+</div>
+
+<div class="stats-bar" id="stats-bar"></div>
+
+<div class="controls">
+  <span class="controls-label">筛选：</span>
+  <input type="text" id="search-input" placeholder="搜索 SKU / 店铺…" oninput="applyFilter()">
+  <select id="store-filter" onchange="applyFilter()">
+    <option value="">全部店铺</option>
+  </select>
+  <span class="controls-label" style="margin-left:8px">排序：</span>
+  <button class="sort-btn active" id="sort-days-e" onclick="setSort('days_e')">日销可售天数↑</button>
+  <button class="sort-btn" id="sort-days-f" onclick="setSort('days_f')">7天可售天数↑</button>
+  <button class="sort-btn" id="sort-daily" onclick="setSort('daily_sales')">日销↓</button>
+  <button class="sort-btn" id="sort-arrival" onclick="setSort('arrival')">最快到达↑</button>
+  <span class="controls-label" style="margin-left:8px">导出：</span>
+  <button class="sort-btn" id="export-csv" onclick="exportCSV()" style="color:#43a047;border-color:#c8e6c9;">📥 导出 CSV</button>
+</div>
+
+<div class="sku-list" id="sku-list">
+  <div class="empty-state"><div class="emoji">⏳</div><div>加载中…</div></div>
+</div>
+
+<script>
+// ===== 数据嵌入 =====
+const RAW_DATA = {"alert_skus":[{"sku":"YU-40TCFZCXZKBN-115","store":"YOORAN-US","staff":"琳娣","daily_sales":0.94,"days_e":6.4,"days_f":5.2,"fba_avail":3,"pending":3,"in_transit_qty":0,"trend":"上涨","total_transit_shipments":0,"total_transit_qty":0,"top3_shipments":[],"gap_flag":false,"receiving_qty":0,"receiving_shipments":[],"ready_qty":0,"ready_shipments":[]},{"sku":"YK-SJDBKGY-115","store":"YOORAN-UK","staff":"家英","daily_sales":1.02,"days_e":10.8,"days_f":11.0,"fba_avail":10,"pending":1,"in_transit_qty":15,"trend":"上涨","total_transit_shipments":1,"total_transit_qty":15,"top3_shipments":[{"shipment_id":"FBA15LX7J3PR","qty":15,"store":"YOORAN-UK","status":"SHIPPED","channel":"英国铁路不包税-卡派按公斤","est_arrival":"2026-07-11","site":"英国","logistics_status":"2026-06-17 09:02:36\n6/16已装柜，预计6/20的班列，具体发车时间请以实际为准"}],"gap_flag":true,"receiving_qty":0,"receiving_shipments":[],"ready_qty":0,"ready_shipments":[]},{"sku":"YD-3.5ZK95TA-110","store":"YOORAN-DE","staff":"家英","daily_sales":8.64,"days_e":15.5,"days_f":13.8,"fba_avail":132,"pending":2,"in_transit_qty":630,"trend":"上涨","total_transit_shipments":5,"total_transit_qty":510,"top3_shipments":[{"shipment_id":"FBA15LSZYV4T","qty":30,"store":"YOORAN-DE","status":"SHIPPED","channel":"欧洲海运包税经济线-亚马逊直送","est_arrival":"2026-06-25","site":"德国","logistics_status":"2026-05-23 14:06:45\n已开船，预计6/17到港，具体以官网实际更新到港为准!"},{"shipment_id":"FBA15LT21LGX","qty":180,"store":"YOORAN-DE","status":"SHIPPED","channel":"欧洲铁路包税限时达-亚马逊直送","est_arrival":"2026-06-29","site":"德国","logistics_status":"2026-06-15 16:17:50\n车厢正在维修中"},{"shipment_id":"FBA15LV505BQ","qty":120,"store":"YOORAN-DE","status":"IN_TRANSIT","channel":"欧洲海运包税经济线-亚马逊直送","est_arrival":"2026-07-10","site":"德国","logistics_status":"2026-06-10 15:55:52\n已开船，预计7/8到港，具体以官网实际更新到港为准!"}],"gap_flag":false,"receiving_qty":0,"receiving_shipments":[],"ready_qty":120,"ready_shipments":[{"shipment_id":"FBA15LXRRR5V","qty":120,"status":"READY_TO_SHIP"}]},{"sku":"YD-3.5ZK95BR-115","store":"YOORAN-DE","staff":"家英","daily_sales":5.74,"days_e":2.3,"days_f":2.1,"fba_avail":12,"pending":1,"in_transit_qty":450,"trend":"上涨","total_transit_shipments":6,"total_transit_qty":390,"top3_shipments":[{"shipment_id":"FBA15LSZYV4T","qty":90,"store":"YOORAN-DE","status":"SHIPPED","channel":"欧洲海运包税经济线-亚马逊直送","est_arrival":"2026-06-25","site":"德国","logistics_status":"2026-05-23 14:06:45\n已开船，预计6/17到港，具体以官网实际更新到港为准!"},{"shipment_id":"FBA15LTYLGFY","qty":30,"store":"YOORAN-DE","status":"SHIPPED","channel":"欧洲铁路包税限时达-亚马逊直送","est_arrival":"2026-06-26","site":"德国","logistics_status":"2026-06-11 20:24:07\n换轨完成已出发，班列正常行驶中"},{"shipment_id":"FBA15LR7JQ28","qty":30,"store":"YOORAN-DE","status":"SHIPPED","channel":"欧洲海运包税限时达-亚马逊直送","est_arrival":"2026-06-29","site":"德国","logistics_status":"2026-06-13 10:00:46\n因港口塞港，船司官网更新预计到港时间为6/21"}],"gap_flag":true,"receiving_qty":60,"receiving_shipments":[{"shipment_id":"FBA15LQJ69X7","qty":60,"status":"RECEIVING"}],"ready_qty":60,"ready_shipments":[{"shipment_id":"FBA15LXRRR5V","qty":60,"status":"READY_TO_SHIP"}]},{"sku":"YD-3.5ZK95BR-120","store":"YOORAN-DE","staff":"家英","daily_sales":2.33,"days_e":6.9,"days_f":6.2,"fba_avail":15,"pending":1,"in_transit_qty":60,"trend":"上涨","total_transit_shipments":0,"total_transit_qty":0,"top3_shipments":[],"gap_flag":false,"receiving_qty":0,"receiving_shipments":[],"ready_qty":180,"ready_shipments":[{"shipment_id":"FBA15LXJFD7D","qty":120,"status":"READY_TO_SHIP"},{"shipment_id":"FBA15LXRRR5V","qty":60,"status":"READY_TO_SHIP"}]},{"sku":"YD-3.5ZK95CE-115","store":"YOORAN-DE","staff":"家英","daily_sales":2.25,"days_e":4.0,"days_f":4.2,"fba_avail":6,"pending":3,"in_transit_qty":270,"trend":"下降","total_transit_shipments":4,"total_transit_qty":210,"top3_shipments":[{"shipment_id":"FBA15LTYLGFY","qty":30,"store":"YOORAN-DE","status":"SHIPPED","channel":"欧洲铁路包税限时达-亚马逊直送","est_arrival":"2026-06-26","site":"德国","logistics_status":"2026-06-11 20:24:07\n换轨完成已出发，班列正常行驶中"},{"shipment_id":"FBA15LV505BQ","qty":90,"store":"YOORAN-DE","status":"IN_TRANSIT","channel":"欧洲海运包税经济线-亚马逊直送","est_arrival":"2026-07-10","site":"德国","logistics_status":"2026-06-10 15:55:52\n已开船，预计7/8到港，具体以官网实际更新到港为准!"},{"shipment_id":"FBA15LV0RNLC","qty":30,"store":"YOORAN-DE","status":"SHIPPED","channel":"欧洲海运包税经济线-亚马逊直送","est_arrival":"2026-07-10","site":"德国","logistics_status":"2026-06-10 09:05:39\n已开船，预计7/4到港，具体以官网实际更新到港为准!"}],"gap_flag":true,"receiving_qty":0,"receiving_shipments":[],"ready_qty":60,"ready_shipments":[{"shipment_id":"FBA15LXRRR5V","qty":60,"status":"READY_TO_SHIP"}]},{"sku":"YD-3.5ZK95BR-125","store":"YOORAN-DE","staff":"家英","daily_sales":2.2,"days_e":3.6,"days_f":2.7,"fba_avail":8,"pending":0,"in_transit_qty":142,"trend":"下降","total_transit_shipments":2,"total_transit_qty":82,"top3_shipments":[{"shipment_id":"FBA15LTYLGFY","qty":30,"store":"YOORAN-DE","status":"SHIPPED","channel":"欧洲铁路包税限时达-亚马逊直送","est_arrival":"2026-06-26","site":"德国","logistics_status":"2026-06-11 20:24:07\n换轨完成已出发，班列正常行驶中"},{"shipment_id":"FBA15LV505BQ","qty":52,"store":"YOORAN-DE","status":"IN_TRANSIT","channel":"欧洲海运包税经济线-亚马逊直送","est_arrival":"2026-07-10","site":"德国","logistics_status":"2026-06-10 15:55:52\n已开船，预计7/8到港，具体以官网实际更新到港为准!"}],"gap_flag":true,"receiving_qty":30,"receiving_shipments":[{"shipment_id":"FBA15LQJ69X7","qty":30,"status":"RECEIVING"}],"ready_qty":60,"ready_shipments":[{"shipment_id":"FBA15LXRRR5V","qty":60,"status":"READY_TO_SHIP"}]},{"sku":"YD-3.5ZK95CE-105","store":"YOORAN-DE","staff":"家英","daily_sales":1.34,"days_e":4.5,"days_f":3.5,"fba_avail":6,"pending":0,"in_transit_qty":0,"trend":"上涨","total_transit_shipments":0,"total_transit_qty":0,"top3_shipments":[],"gap_flag":false,"receiving_qty":0,"receiving_shipments":[],"ready_qty":0,"ready_shipments":[]},{"sku":"40FGZKTCSXBN-115-UK","store":"DOOPAI-UK","staff":"婉雯","daily_sales":15.81,"days_e":3.3,"days_f":2.9,"fba_avail":48,"pending":4,"in_transit_qty":1113,"trend":"上涨","total_transit_shipments":10,"total_transit_qty":1011,"top3_shipments":[{"shipment_id":"FBA15LR828X9","qty":120,"store":"DOOPAI-UK","status":"IN_TRANSIT","channel":"英国海运不包税-卡派按公斤","est_arrival":"2026-06-23","site":"英国","logistics_status":"2026-06-16 19:00:10\n6月16日已清关放行，会尽快送仓"},{"shipment_id":"FBA15LXPTGJG","qty":60,"store":"DOOPAI-UK","status":"SHIPPED","channel":"英国空运普货五日提不包税-卡派","est_arrival":"2026-06-30","site":"英国","logistics_status":"2026-06-17 09:14:49\n6/16已出仓，预计6/19的航班"},{"shipment_id":"FBA15LRVDWS6","qty":60,"store":"DOOPAI-UK","status":"IN_TRANSIT","channel":"英国海运不包税-卡派按公斤","est_arrival":"2026-06-30","site":"英国","logistics_status":"2026-05-25 19:13:08\n已开船，预计6/28到港，具体以官网实际更新到港为准!"}],"gap_flag":false,"receiving_qty":60,"receiving_shipments":[{"shipment_id":"FBA15LR816NB","qty":60,"status":"RECEIVING"}],"ready_qty":0,"ready_shipments":[]},{"sku":"3.5ZK95BR-115UK","store":"DOOPAI-UK","staff":"婉雯","daily_sales":14.28,"days_e":2.7,"days_f":2.4,"fba_avail":33,"pending":6,"in_transit_qty":992,"trend":"上涨","total_transit_shipments":8,"total_transit_qty":890,"top3_shipments":[{"shipment_id":"FBA15LR828X9","qty":120,"store":"DOOPAI-UK","status":"IN_TRANSIT","channel":"英国海运不包税-卡派按公斤","est_arrival":"2026-06-23","site":"英国","logistics_status":"2026-06-16 19:00:10\n6月16日已清关放行，会尽快送仓"},{"shipment_id":"FBA15LXPTGJG","qty":60,"store":"DOOPAI-UK","status":"SHIPPED","channel":"英国空运普货五日提不包税-卡派","est_arrival":"2026-06-30","site":"英国","logistics_status":"2026-06-17 09:14:49\n6/16已出仓，预计6/19的航班"},{"shipment_id":"FBA15LRVDWS6","qty":50,"store":"DOOPAI-UK","status":"IN_TRANSIT","channel":"英国海运不包税-卡派按公斤","est_arrival":"2026-06-30","site":"英国","logistics_status":"2026-05-25 19:13:08\n已开船，预计6/28到港，具体以官网实际更新到港为准!"}],"gap_flag":true,"receiving_qty":60,"receiving_shipments":[{"shipment_id":"FBA15LR816NB","qty":60,"status":"RECEIVING"}],"ready_qty":0,"ready_shipments":[]},{"sku":"219BK115-UK","store":"DOOPAI-UK","staff":"婉雯","daily_sales":12.24,"days_e":4.3,"days_f":4.0,"fba_avail":0,"pending":53,"in_transit_qty":633,"trend":"上涨","total_transit_shipments":5,"total_transit_qty":582,"top3_shipments":[{"shipment_id":"FBA15LR828X9","qty":120,"store":"DOOPAI-UK","status":"IN_TRANSIT","channel":"英国海运不包税-卡派按公斤","est_arrival":"2026-06-23","site":"英国","logistics_status":"2026-06-16 19:00:10\n6月16日已清关放行，会尽快送仓"},{"shipment_id":"FBA15LTSLK13","qty":102,"store":"DOOPAI-UK","status":"IN_TRANSIT","channel":"英国海运不包税-卡派按公斤","est_arrival":"2026-07-12","site":"英国","logistics_status":"2026-06-01 20:13:42\n已开船，预计7/5到港，具体以官网实际更新到港为准!"},{"shipment_id":"FBA15LWWFY11","qty":120,"store":"DOOPAI-UK","status":"IN_TRANSIT","channel":"英国铁路不包税-卡派按公斤","est_arrival":"2026-07-24","site":"英国","logistics_status":"2026-06-14 09:22:26\n6/13已装柜，预计6/16的班列，具体发车时间请以实际为准"}],"gap_flag":false,"receiving_qty":111,"receiving_shipments":[{"shipment_id":"FBA15LW9H6X3","qty":51,"status":"RECEIVING"},{"shipment_id":"FBA15LR816NB","qty":60,"status":"RECEIVING"}],"ready_qty":0,"ready_shipments":[]},{"sku":"3.5ZK95BR-125UK","store":"DOOPAI-UK","staff":"婉雯","daily_sales":5.05,"days_e":10.1,"days_f":10.2,"fba_avail":50,"pending":1,"in_transit_qty":363,"trend":"上涨","total_transit_shipments":6,"total_transit_qty":363,"top3_shipments":[{"shipment_id":"FBA15LWBNKRC","qty":30,"store":"DOOPAI-UK","status":"SHIPPED","channel":"英国空运普货五日提不包税-卡派","est_arrival":"2026-06-17","site":"英国","logistics_status":"2026-06-15 14:01:10\n因货站货量激增暂未理完货，我司清关行还未收到提货通知，目前已催促货站中"},{"shipment_id":"FBA15LR828X9","qty":60,"store":"DOOPAI-UK","status":"IN_TRANSIT","channel":"英国海运不包税-卡派按公斤","est_arrival":"2026-06-23","site":"英国","logistics_status":"2026-06-16 19:00:10\n6月16日已清关放行，会尽快送仓"},{"shipment_id":"FBA15LXPTGJG","qty":60,"store":"DOOPAI-UK","status":"SHIPPED","channel":"英国空运普货五日提不包税-卡派","est_arrival":"2026-06-30","site":"英国","logistics_status":"2026-06-17 09:14:49\n6/16已出仓，预计6/19的航班"}],"gap_flag":false,"receiving_qty":60,"receiving_shipments":[{"shipment_id":"FBA15LVCTY3G","qty":60,"status":"RECEIVING"}],"ready_qty":0,"ready_shipments":[]},{"sku":"40FGZKTCSXBN-105-UK","store":"DOOPAI-UK","staff":"婉雯","daily_sales":4.32,"days_e":7.0,"days_f":6.2,"fba_avail":28,"pending":2,"in_transit_qty":375,"trend":"下降","total_transit_shipments":6,"total_transit_qty":294,"top3_shipments":[{"shipment_id":"FBA15LR828X9","qty":51,"store":"DOOPAI-UK","status":"IN_TRANSIT","channel":"英国海运不包税-卡派按公斤","est_arrival":"2026-06-23","site":"英国","logistics_status":"2026-06-16 19:00:10\n6月16日已清关放行，会尽快送仓"},{"shipment_id":"FBA15LXPTGJG","qty":60,"store":"DOOPAI-UK","status":"SHIPPED","channel":"英国空运普货五日提不包税-卡派","est_arrival":"2026-06-30","site":"英国","logistics_status":"2026-06-17 09:14:49\n6/16已出仓，预计6/19的航班"},{"shipment_id":"FBA15LRVDWS6","qty":30,"store":"DOOPAI-UK","status":"IN_TRANSIT","channel":"英国海运不包税-卡派按公斤","est_arrival":"2026-06-30","site":"英国","logistics_status":"2026-05-25 19:13:08\n已开船，预计6/28到港，具体以官网实际更新到港为准!"}],"gap_flag":false,"receiving_qty":51,"receiving_shipments":[{"shipment_id":"FBA15LVCTY3G","qty":51,"status":"RECEIVING"}],"ready_qty":0,"ready_shipments":[]},{"sku":"40FGZKTCSXBN-125-UK","store":"DOOPAI-UK","staff":"婉雯","daily_sales":4.23,"days_e":6.6,"days_f":5.8,"fba_avail":28,"pending":0,"in_transit_qty":282,"trend":"上涨","total_transit_shipments":7,"total_transit_qty":282,"top3_shipments":[{"shipment_id":"FBA15LR828X9","qty":60,"store":"DOOPAI-UK","status":"IN_TRANSIT","channel":"英国海运不包税-卡派按公斤","est_arrival":"2026-06-23","site":"英国","logistics_status":"2026-06-16 19:00:10\n6月16日已清关放行，会尽快送仓"},{"shipment_id":"FBA15LXPTGJG","qty":51,"store":"DOOPAI-UK","status":"SHIPPED","channel":"英国空运普货五日提不包税-卡派","est_arrival":"2026-06-30","site":"英国","logistics_status":"2026-06-17 09:14:49\n6/16已出仓，预计6/19的航班"},{"shipment_id":"FBA15LRVDWS6","qty":30,"store":"DOOPAI-UK","status":"IN_TRANSIT","channel":"英国海运不包税-卡派按公斤","est_arrival":"2026-06-30","site":"英国","logistics_status":"2026-05-25 19:13:08\n已开船，预计6/28到港，具体以官网实际更新到港为准!"}],"gap_flag":false,"receiving_qty":0,"receiving_shipments":[],"ready_qty":0,"ready_shipments":[]},{"sku":"219BK125-UK","store":"DOOPAI-UK","staff":"婉雯","daily_sales":3.51,"days_e":13.7,"days_f":16.0,"fba_avail":18,"pending":30,"in_transit_qty":226,"trend":"上涨","total_transit_shipments":4,"total_transit_qty":175,"top3_shipments":[{"shipment_id":"FBA15LTSLK13","qty":25,"store":"DOOPAI-UK","status":"IN_TRANSIT","channel":"英国海运不包税-卡派按公斤","est_arrival":"2026-07-12","site":"英国","logistics_status":"2026-06-01 20:13:42\n已开船，预计7/5到港，具体以官网实际更新到港为准!"},{"shipment_id":"FBA15LVVXZRT","qty":30,"store":"DOOPAI-UK","status":"IN_TRANSIT","channel":"英国海运不包税-卡派按公斤","est_arrival":"2026-07-29","site":"英国","logistics_status":"2026-06-09 11:58:50\n6/9已开船，预计7/12到港，具体以官网实际更新到港为准!"},{"shipment_id":"FBA15LXCJFY1","qty":60,"store":"DOOPAI-UK","status":"SHIPPED","channel":"英国海运不包税-卡派按公斤","est_arrival":"2026-08-02","site":"英国","logistics_status":"2026-06-17 02:49:45\n东莞清溪仓 已收货"}],"gap_flag":true,"receiving_qty":55,"receiving_shipments":[{"shipment_id":"FBA15LW9H6X3","qty":30,"status":"RECEIVING"},{"shipment_id":"FBA15LR816NB","qty":25,"status":"RECEIVING"}],"ready_qty":0,"ready_shipments":[]},{"sku":"TLYKWE-125UK","store":"DOOPAI-UK","staff":"婉雯","daily_sales":2.44,"days_e":0.0,"days_f":0.0,"fba_avail":0,"pending":0,"in_transit_qty":350,"trend":"下降","total_transit_shipments":3,"total_transit_qty":250,"top3_shipments":[{"shipment_id":"FBA15LWBNKRC","qty":100,"store":"DOOPAI-UK","status":"SHIPPED","channel":"英国空运普货五日提不包税-卡派","est_arrival":"2026-06-17","site":"英国","logistics_status":"2026-06-15 14:01:10\n因货站货量激增暂未理完货，我司清关行还未收到提货通知，目前已催促货站中"},{"shipment_id":"FBA15LVVXZRT","qty":100,"store":"DOOPAI-UK","status":"IN_TRANSIT","channel":"英国海运不包税-卡派按公斤","est_arrival":"2026-07-29","site":"英国","logistics_status":"2026-06-09 11:58:50\n6/9已开船，预计7/12到港，具体以官网实际更新到港为准!"},{"shipment_id":"FBA15LXQNBWC","qty":50,"store":"DOOPAI-UK","status":"SHIPPED","channel":"英国铁路不包税-卡派按公斤","est_arrival":"2026-08-06","site":"英国","logistics_status":"2026-06-17 02:50:26\n东莞清溪仓 已收货"}],"gap_flag":true,"receiving_qty":0,"receiving_shipments":[],"ready_qty":0,"ready_shipments":[]},{"sku":"3.5ZK95BR-135UK","store":"DOOPAI-UK","staff":"婉雯","daily_sales":2.43,"days_e":4.9,"days_f":4.4,"fba_avail":12,"pending":0,"in_transit_qty":166,"trend":"上涨","total_transit_shipments":5,"total_transit_qty":166,"top3_shipments":[{"shipment_id":"FBA15LWBNKRC","qty":30,"store":"DOOPAI-UK","status":"SHIPPED","channel":"英国空运普货五日提不包税-卡派","est_arrival":"2026-06-17","site":"英国","logistics_status":"2026-06-15 14:01:10\n因货站货量激增暂未理完货，我司清关行还未收到提货通知，目前已催促货站中"},{"shipment_id":"FBA15LRVDWS6","qty":25,"store":"DOOPAI-UK","status":"IN_TRANSIT","channel":"英国海运不包税-卡派按公斤","est_arrival":"2026-06-30","site":"英国","logistics_status":"2026-05-25 19:13:08\n已开船，预计6/28到港，具体以官网实际更新到港为准!"},{"shipment_id":"FBA15LTSLK13","qty":30,"store":"DOOPAI-UK","status":"IN_TRANSIT","channel":"英国海运不包税-卡派按公斤","est_arrival":"2026-07-12","site":"英国","logistics_status":"2026-06-01 20:13:42\n已开船，预计7/5到港，具体以官网实际更新到港为准!"}],"gap_flag":true,"receiving_qty":0,"receiving_shipments":[],"ready_qty":0,"ready_shipments":[]},{"sku":"40FGZKTCSXBN-135-UK","store":"DOOPAI-UK","staff":"婉雯","daily_sales":1.93,"days_e":1.6,"days_f":1.5,"fba_avail":2,"pending":1,"in_transit_qty":171,"trend":"下降","total_transit_shipments":2,"total_transit_qty":60,"top3_shipments":[{"shipment_id":"FBA15LTSLK13","qty":30,"store":"DOOPAI-UK","status":"IN_TRANSIT","channel":"英国海运不包税-卡派按公斤","est_arrival":"2026-07-12","site":"英国","logistics_status":"2026-06-01 20:13:42\n已开船，预计7/5到港，具体以官网实际更新到港为准!"},{"shipment_id":"FBA15LVVXZRT","qty":30,"store":"DOOPAI-UK","status":"IN_TRANSIT","channel":"英国海运不包税-卡派按公斤","est_arrival":"2026-07-29","site":"英国","logistics_status":"2026-06-09 11:58:50\n6/9已开船，预计7/12到港，具体以官网实际更新到港为准!"}],"gap_flag":true,"receiving_qty":0,"receiving_shipments":[],"ready_qty":0,"ready_shipments":[]},{"sku":"3.5ZK149BK-115UK","store":"DOOPAI-UK","staff":"婉雯","daily_sales":1.8,"days_e":3.3,"days_f":4.2,"fba_avail":0,"pending":6,"in_transit_qty":196,"trend":"上涨","total_transit_shipments":4,"total_transit_qty":166,"top3_shipments":[{"shipment_id":"FBA15LWBNKRC","qty":51,"store":"DOOPAI-UK","status":"SHIPPED","channel":"英国空运普货五日提不包税-卡派","est_arrival":"2026-06-17","site":"英国","logistics_status":"2026-06-15 14:01:10\n因货站货量激增暂未理完货，我司清关行还未收到提货通知，目前已催促货站中"},{"shipment_id":"FBA15LTSLK13","qty":60,"store":"DOOPAI-UK","status":"IN_TRANSIT","channel":"英国海运不包税-卡派按公斤","est_arrival":"2026-07-12","site":"英国","logistics_status":"2026-06-01 20:13:42\n已开船，预计7/5到港，具体以官网实际更新到港为准!"},{"shipment_id":"FBA15LVVXZRT","qty":25,"store":"DOOPAI-UK","status":"IN_TRANSIT","channel":"英国海运不包税-卡派按公斤","est_arrival":"2026-07-29","site":"英国","logistics_status":"2026-06-09 11:58:50\n6/9已开船，预计7/12到港，具体以官网实际更新到港为准!"}],"gap_flag":true,"receiving_qty":0,"receiving_shipments":[],"ready_qty":0,"ready_shipments":[]},{"sku":"219BK150-UK","store":"DOOPAI-UK","staff":"婉雯","daily_sales":1.54,"days_e":1.3,"days_f":1.1,"fba_avail":2,"pending":0,"in_transit_qty":60,"trend":"上涨","total_transit_shipments":2,"total_transit_qty":60,"top3_shipments":[{"shipment_id":"FBA15LWWFY11","qty":30,"store":"DOOPAI-UK","status":"IN_TRANSIT","channel":"英国铁路不包税-卡派按公斤","est_arrival":"2026-07-24","site":"英国","logistics_status":"2026-06-14 09:22:26\n6/13已装柜，预计6/16的班列，具体发车时间请以实际为准"},{"shipment_id":"FBA15LXQNBWC","qty":30,"store":"DOOPAI-UK","status":"SHIPPED","channel":"英国铁路不包税-卡派按公斤","est_arrival":"2026-08-06","site":"英国","logistics_status":"2026-06-17 02:50:26\n东莞清溪仓 已收货"}],"gap_flag":true,"receiving_qty":0,"receiving_shipments":[],"ready_qty":0,"ready_shipments":[]},{"sku":"3.5ZK95BR-145UK","store":"DOOPAI-UK","staff":"婉雯","daily_sales":1.48,"days_e":0.7,"days_f":0.6,"fba_avail":1,"pending":0,"in_transit_qty":120,"trend":"上涨","total_transit_shipments":4,"total_transit_qty":120,"top3_shipments":[{"shipment_id":"FBA15LRVDWS6","qty":30,"store":"DOOPAI-UK","status":"IN_TRANSIT","channel":"英国海运不包税-卡派按公斤","est_arrival":"2026-06-30","site":"英国","logistics_status":"2026-05-25 19:13:08\n已开船，预计6/28到港，具体以官网实际更新到港为准!"},{"shipment_id":"FBA15LTSLK13","qty":30,"store":"DOOPAI-UK","status":"IN_TRANSIT","channel":"英国海运不包税-卡派按公斤","est_arrival":"2026-07-12","site":"英国","logistics_status":"2026-06-01 20:13:42\n已开船，预计7/5到港，具体以官网实际更新到港为准!"},{"shipment_id":"FBA15LXCJFY1","qty":30,"store":"DOOPAI-UK","status":"SHIPPED","channel":"英国海运不包税-卡派按公斤","est_arrival":"2026-08-02","site":"英国","logistics_status":"2026-06-17 02:49:45\n东莞清溪仓 已收货"}],"gap_flag":true,"receiving_qty":0,"receiving_shipments":[],"ready_qty":0,"ready_shipments":[]},{"sku":"40FGZKTCSXTA-115-UK","store":"DOOPAI-UK","staff":"婉雯","daily_sales":1.31,"days_e":3.8,"days_f":3.5,"fba_avail":5,"pending":0,"in_transit_qty":120,"trend":"上涨","total_transit_shipments":2,"total_transit_qty":90,"top3_shipments":[{"shipment_id":"FBA15LTSLK13","qty":30,"store":"DOOPAI-UK","status":"IN_TRANSIT","channel":"英国海运不包税-卡派按公斤","est_arrival":"2026-07-12","site":"英国","logistics_status":"2026-06-01 20:13:42\n已开船，预计7/5到港，具体以官网实际更新到港为准!"},{"shipment_id":"FBA15LXQNBWC","qty":60,"store":"DOOPAI-UK","status":"SHIPPED","channel":"英国铁路不包税-卡派按公斤","est_arrival":"2026-08-06","site":"英国","logistics_status":"2026-06-17 02:50:26\n东莞清溪仓 已收货"}],"gap_flag":true,"receiving_qty":0,"receiving_shipments":[],"ready_qty":0,"ready_shipments":[]},{"sku":"3.5ZK95BE-115UK","store":"DOOPAI-UK","staff":"婉雯","daily_sales":0.99,"days_e":1.0,"days_f":1.2,"fba_avail":1,"pending":0,"in_transit_qty":105,"trend":"上涨","total_transit_shipments":4,"total_transit_qty":105,"top3_shipments":[{"shipment_id":"FBA15LR828X9","qty":25,"store":"DOOPAI-UK","status":"IN_TRANSIT","channel":"英国海运不包税-卡派按公斤","est_arrival":"2026-06-23","site":"英国","logistics_status":"2026-06-16 19:00:10\n6月16日已清关放行，会尽快送仓"},{"shipment_id":"FBA15LRVDWS6","qty":25,"store":"DOOPAI-UK","status":"IN_TRANSIT","channel":"英国海运不包税-卡派按公斤","est_arrival":"2026-06-30","site":"英国","logistics_status":"2026-05-25 19:13:08\n已开船，预计6/28到港，具体以官网实际更新到港为准!"},{"shipment_id":"FBA15LWJ727M","qty":30,"store":"DOOPAI-UK","status":"IN_TRANSIT","channel":"英国海运不包税-卡派按公斤","est_arrival":"2026-08-03","site":"英国","logistics_status":"2026-06-12 10:12:15\n6/11已装柜，船名航次：OOCL TURKIYE 011W，预计6/18开船，具体以官网实际更新"}],"gap_flag":true,"receiving_qty":0,"receiving_shipments":[],"ready_qty":0,"ready_shipments":[]},{"sku":"YKTLWE-125DE","store":"DOOPAI-DE","staff":"婉雯","daily_sales":11.73,"days_e":2.1,"days_f":1.9,"fba_avail":20,"pending":5,"in_transit_qty":800,"trend":"上涨","total_transit_shipments":7,"total_transit_qty":750,"top3_shipments":[{"shipment_id":"FBA15LQFFP9Z","qty":100,"store":"DOOPAI-DE","status":"SHIPPED","channel":"欧洲铁路包税经济线-亚马逊直送","est_arrival":"2026-06-22","site":"德国","logistics_status":"2026-06-13 19:02:30\n6/13班列已到站，提柜文件已发，待提柜清关"},{"shipment_id":"FBA15LXL935T","qty":100,"store":"DOOPAI-DE","status":"SHIPPED","channel":"欧洲空运普货六日提包税-直送","est_arrival":"2026-06-25","site":"德国","logistics_status":"2026-06-17 00:00:55\n机场仓 已收货"},{"shipment_id":"FBA15LRKQSPP","qty":50,"store":"DOOPAI-DE","status":"SHIPPED","channel":"德国准时达（包税）\n德国 BER8","est_arrival":"2026-07-05","site":"德国","logistics_status":"6-4已经离港  预计7-1到港"}],"gap_flag":false,"receiving_qty":100,"receiving_shipments":[{"shipment_id":"FBA15LPQ5XND","qty":50,"status":"RECEIVING"},{"shipment_id":"FBA15LNP0FM5","qty":50,"status":"RECEIVING"}],"ready_qty":0,"ready_shipments":[]},{"sku":"SJDBG-105","store":"DOOPAI-DE","staff":"婉雯","daily_sales":7.77,"days_e":14.0,"days_f":12.5,"fba_avail":108,"pending":1,"in_transit_qty":360,"trend":"上涨","total_transit_shipments":5,"total_transit_qty":420,"top3_shipments":[{"shipment_id":"FBA19DYYBM5K","qty":60,"store":"DOOPAI-CA","status":"SHIPPED","channel":"加拿大海运美转加美森17日达-卡派","est_arrival":"2026-06-25","site":"加拿大","logistics_status":"2026-06-16 19:50:37\n6月16日已发车加拿大，预计6月19号抵达美加边境清关点"},{"shipment_id":"FBA19FDDNPHL","qty":60,"store":"DOOPAI-CA","status":"SHIPPED","channel":"加拿大海运美转加美森17日达-卡派","est_arrival":"2026-06-27","site":"加拿大","logistics_status":"2026-06-10 19:39:37\n6月10日已开船，预计6月21日到港"},{"shipment_id":"FBA15LVHQ0NT","qty":120,"store":"DOOPAI-DE","status":"SHIPPED","channel":"友捷达-铁路包税-快递派","est_arrival":"2026-07-02","site":"德国","logistics_status":"列车正在行驶中"}],"gap_flag":false,"receiving_qty":0,"receiving_shipments":[],"ready_qty":60,"ready_shipments":[{"shipment_id":"FBA15LWWKFF1","qty":60,"status":"READY_TO_SHIP"}]},{"sku":"SJDBE-105","store":"DOOPAI-DE","staff":"婉雯","daily_sales":1.84,"days_e":11.4,"days_f":9.2,"fba_avail":18,"pending":3,"in_transit_qty":76,"trend":"上涨","total_transit_shipments":5,"total_transit_qty":136,"top3_shipments":[{"shipment_id":"FBA19DYYBM5K","qty":15,"store":"DOOPAI-CA","status":"SHIPPED","channel":"加拿大海运美转加美森17日达-卡派","est_arrival":"2026-06-25","site":"加拿大","logistics_status":"2026-06-16 19:50:37\n6月16日已发车加拿大，预计6月19号抵达美加边境清关点"},{"shipment_id":"FBA19FDDNPHL","qty":30,"store":"DOOPAI-CA","status":"SHIPPED","channel":"加拿大海运美转加美森17日达-卡派","est_arrival":"2026-06-27","site":"加拿大","logistics_status":"2026-06-10 19:39:37\n6月10日已开船，预计6月21日到港"},{"shipment_id":"FBA15LS9SSQ5","qty":25,"store":"DOOPAI-DE","status":"SHIPPED","channel":"欧洲铁路包税经济线-亚马逊直送","est_arrival":"2026-07-07","site":"德国","logistics_status":"2026-06-16 16:39:12\n6/16已清关放行，会尽快送仓"}],"gap_flag":false,"receiving_qty":30,"receiving_shipments":[{"shipment_id":"FBA19CSCCYKL","qty":30,"status":"RECEIVING"}],"ready_qty":0,"ready_shipments":[]},{"sku":"jpzd25- we125","store":"DOOPAI-DE","staff":"婉雯","daily_sales":1.6,"days_e":6.2,"days_f":4.7,"fba_avail":7,"pending":3,"in_transit_qty":132,"trend":"上涨","total_transit_shipments":3,"total_transit_qty":132,"top3_shipments":[{"shipment_id":"FBA15LVHQ0NT","qty":51,"store":"DOOPAI-DE","status":"SHIPPED","channel":"友捷达-铁路包税-快递派","est_arrival":"2026-07-02","site":"德国","logistics_status":"列车正在行驶中"},{"shipment_id":"FBA15LS9SSQ5","qty":30,"store":"DOOPAI-DE","status":"SHIPPED","channel":"欧洲铁路包税经济线-亚马逊直送","est_arrival":"2026-07-07","site":"德国","logistics_status":"2026-06-16 16:39:12\n6/16已清关放行，会尽快送仓"},{"shipment_id":"FBA15LSMB483","qty":51,"store":"DOOPAI-DE","status":"IN_TRANSIT","channel":"EU-海运直送专线-BS","est_arrival":"","site":"德国","logistics_status":"6-10已开船，预计7-15号到港。船名航次：CMA CGM RIGOLETTO 0R10GW1MA"}],"gap_flag":true,"receiving_qty":30,"receiving_shipments":[{"shipment_id":"FBA15LR85BRY","qty":30,"status":"RECEIVING"}],"ready_qty":0,"ready_shipments":[]},{"sku":"jpzd25- we135","store":"DOOPAI-DE","staff":"婉雯","daily_sales":1.49,"days_e":7.4,"days_f":6.4,"fba_avail":11,"pending":0,"in_transit_qty":85,"trend":"上涨","total_transit_shipments":2,"total_transit_qty":85,"top3_shipments":[{"shipment_id":"FBA15LSB39Z2","qty":25,"store":"DOOPAI-DE","status":"SHIPPED","channel":"欧洲海运包税经济线-亚马逊直送","est_arrival":"2026-07-06","site":"德国","logistics_status":"2026-06-10 09:18:51\n实际6/10已开船，预计7/4到港，具体以官网实际更新到港为准!"},{"shipment_id":"FBA15LXPNDH2","qty":60,"store":"DOOPAI-DE","status":"SHIPPED","channel":"EU-铁路直送专线-BS","est_arrival":"2026-08-09","site":"德国","logistics_status":"2026-06-17 10:35:03已确认"}],"gap_flag":true,"receiving_qty":25,"receiving_shipments":[{"shipment_id":"FBA15LR85BRY","qty":25,"status":"RECEIVING"}],"ready_qty":0,"ready_shipments":[]},{"sku":"jpzd24- rd115","store":"DOOPAI-DE","staff":"婉雯","daily_sales":1.49,"days_e":0.7,"days_f":0.8,"fba_avail":0,"pending":1,"in_transit_qty":150,"trend":"上涨","total_transit_shipments":4,"total_transit_qty":150,"top3_shipments":[{"shipment_id":"FBA15LS9SSQ5","qty":30,"store":"DOOPAI-DE","status":"SHIPPED","channel":"欧洲铁路包税经济线-亚马逊直送","est_arrival":"2026-07-07","site":"德国","logistics_status":"2026-06-16 16:39:12\n6/16已清关放行，会尽快送仓"},{"shipment_id":"FBA15LWS3RV5","qty":60,"store":"DOOPAI-DE","status":"IN_TRANSIT","channel":"友捷达-铁路包税-卡车派","est_arrival":"2026-07-24","site":"德国","logistics_status":"2026-06-15 10:36:13\n已装柜 预计6-15发车 以实际发车时间为准"},{"shipment_id":"FBA15LXPNDH2","qty":30,"store":"DOOPAI-DE","status":"SHIPPED","channel":"EU-铁路直送专线-BS","est_arrival":"2026-08-09","site":"德国","logistics_status":"2026-06-17 10:35:03已确认"}],"gap_flag":true,"receiving_qty":0,"receiving_shipments":[],"ready_qty":0,"ready_shipments":[]},{"sku":"YKTLBKWE-125DE","store":"DOOPAI-DE","staff":"婉雯","daily_sales":1.24,"days_e":0.0,"days_f":0.0,"fba_avail":0,"pending":0,"in_transit_qty":125,"trend":"下降","total_transit_shipments":3,"total_transit_qty":125,"top3_shipments":[{"shipment_id":"FBA15LVHQ0NT","qty":50,"store":"DOOPAI-DE","status":"SHIPPED","channel":"友捷达-铁路包税-快递派","est_arrival":"2026-07-02","site":"德国","logistics_status":"列车正在行驶中"},{"shipment_id":"FBA15LW4SXJM","qty":50,"store":"DOOPAI-DE","status":"SHIPPED","channel":"友优达-欧洲-海运-卡派-包税","est_arrival":"2026-07-29","site":"德国","logistics_status":"2026-06-10 10:45:59\n6月9号已发车"},{"shipment_id":"FBA15LT6HN7T","qty":25,"store":"DOOPAI-DE","status":"IN_TRANSIT","channel":"EU-铁路直送专线-BS","est_arrival":"","site":"德国","logistics_status":"2026-06-15 00:00:00已到站马拉已到站，卸柜中，预计2-4个工作日提柜"}],"gap_flag":true,"receiving_qty":0,"receiving_shipments":[],"ready_qty":0,"ready_shipments":[]},{"sku":"SJDBE-115","store":"DOOPAI-DE","staff":"婉雯","daily_sales":1.22,"days_e":9.9,"days_f":9.3,"fba_avail":12,"pending":0,"in_transit_qty":60,"trend":"上涨","total_transit_shipments":4,"total_transit_qty":105,"top3_shipments":[{"shipment_id":"FBA19DYVWH6V","qty":15,"store":"DOOPAI-CA","status":"SHIPPED","channel":"加拿大海运美转加OA25日达-卡派","est_arrival":"2026-06-25","site":"加拿大","logistics_status":"2026-06-04 04:42:01\n6月4日已开船，预计6月18日到港"},{"shipment_id":"FBA19D6BT2JN","qty":30,"store":"DOOPAI-CA","status":"IN_TRANSIT","channel":"加拿大海运直航不包税-卡派","est_arrival":"2026-06-27","site":"加拿大","logistics_status":"2026-06-11 17:11:12\n6月11日已上火车转运，预计6月18号抵达目的港多伦多清关点"},{"shipment_id":"FBA15LWS3RV5","qty":30,"store":"DOOPAI-DE","status":"IN_TRANSIT","channel":"友捷达-铁路包税-卡车派","est_arrival":"2026-07-24","site":"德国","logistics_status":"2026-06-15 10:36:13\n已装柜 预计6-15发车 以实际发车时间为准"}],"gap_flag":false,"receiving_qty":0,"receiving_shipments":[],"ready_qty":0,"ready_shipments":[]},{"sku":"YKTLBKGYWE-125DE","store":"DOOPAI-DE","staff":"婉雯","daily_sales":1.05,"days_e":14.3,"days_f":9.6,"fba_avail":14,"pending":1,"in_transit_qty":30,"trend":"上涨","total_transit_shipments":1,"total_transit_qty":30,"top3_shipments":[{"shipment_id":"FBA15LQFFP9Z","qty":30,"store":"DOOPAI-DE","status":"SHIPPED","channel":"欧洲铁路包税经济线-亚马逊直送","est_arrival":"2026-06-22","site":"德国","logistics_status":"2026-06-13 19:02:30\n6/13班列已到站，提柜文件已发，待提柜清关"}],"gap_flag":false,"receiving_qty":33,"receiving_shipments":[{"shipment_id":"FBA15LR85BRY","qty":33,"status":"RECEIVING"}],"ready_qty":0,"ready_shipments":[]},{"sku":"SJDBG-130","store":"DOOPAI-DE","staff":"婉雯","daily_sales":0.98,"days_e":4.1,"days_f":2.8,"fba_avail":4,"pending":0,"in_transit_qty":30,"trend":"上涨","total_transit_shipments":1,"total_transit_qty":30,"top3_shipments":[{"shipment_id":"FBA15LXPNDH2","qty":30,"store":"DOOPAI-DE","status":"SHIPPED","channel":"EU-铁路直送专线-BS","est_arrival":"2026-08-09","site":"德国","logistics_status":"2026-06-17 10:35:03已确认"}],"gap_flag":true,"receiving_qty":0,"receiving_shipments":[],"ready_qty":0,"ready_shipments":[]}],"today":"2026-06-20"};
+const TODAY_STR = RAW_DATA.today;
+const TODAY = new Date(TODAY_STR);
+
+function daysDiff(dateStr) {
+  if (!dateStr) return null;
+  return Math.round((new Date(dateStr) - TODAY) / 86400000);
+}
+function arrivalClass(dateStr) {
+  const d = daysDiff(dateStr);
+  if (d === null) return 'arrival-na';
+  if (d <= 14) return 'arrival-soon';
+  if (d <= 30) return 'arrival-mid';
+  return 'arrival-far';
+}
+function daysClass(val) {
+  if (val == null) return '';
+  if (val <= 7) return 'danger';
+  if (val <= 15) return 'warn';
+  return 'ok';
+}
+function urgencyLevel(item) {
+  const m = Math.min(item.days_e ?? 999, item.days_f ?? 999);
+  if (m <= 5) return 'urgent';
+  if (m <= 10) return 'warning';
+  return 'caution';
+}
+// 返回所有适用标签的 HTML 字符串（多标签并列，不覆盖）
+function urgencyBadgesHTML(item) {
+  const lv = urgencyLevel(item);
+  let badges = '';
+  if (lv === 'urgent')  badges += '<span class="sku-badge badge-urgent">🔴 极度紧急</span>';
+  if (lv === 'warning') badges += '<span class="sku-badge badge-warning">🟠 紧急</span>';
+  if (lv === 'caution') badges += '<span class="sku-badge badge-caution">🟡 需关注</span>';
+  if (item.gap_flag)    badges += '<span class="sku-badge badge-gap">⚡衔接不上</span>';
+  return badges;
+}
+
+let sortMode = 'days_e', sortAsc = true, filterUrgency = '';
+
+function setSort(mode) {
+  sortAsc = sortMode === mode ? !sortAsc : (mode !== 'daily_sales');
+  sortMode = mode;
+  document.querySelectorAll('.sort-btn').forEach(b => b.classList.remove('active'));
+  const m = {days_e:'sort-days-e',days_f:'sort-days-f',daily_sales:'sort-daily',arrival:'sort-arrival'};
+  const btn = document.getElementById(m[mode]); if (btn) btn.classList.add('active');
+  applyFilter();
+}
+function sortedData(data) {
+  return [...data].sort((a,b) => {
+    let va,vb;
+    if (sortMode === 'arrival') {
+      const f = x => x.top3_shipments?.[0]?.est_arrival || '9999-12-31';
+      return sortAsc ? f(a).localeCompare(f(b)) : f(b).localeCompare(f(a));
+    }
+    const get = k => k === 'days_e' ? 'days_e' : k === 'days_f' ? 'days_f' : 'daily_sales';
+    const k = get(sortMode);
+    va = a[k] ?? 9999; vb = b[k] ?? 9999;
+    return sortAsc ? va - vb : vb - va;
+  });
+}
+
+function initStores() {
+  const stores = [...new Set(RAW_DATA.alert_skus.map(d => d.store))].sort();
+  const sel = document.getElementById('store-filter');
+  stores.forEach(s => { const o = document.createElement('option'); o.value = s; o.textContent = s; sel.appendChild(o); });
+}
+
+function renderStats(data) {
+  const total = data.length;
+  const urgent = data.filter(d => urgencyLevel(d) === 'urgent').length;
+  const warning = data.filter(d => urgencyLevel(d) === 'warning').length;
+  const caution = data.filter(d => urgencyLevel(d) === 'caution').length;
+  const gap = data.filter(d => d.gap_flag).length;
+  const ht = data.filter(d => d.total_transit_shipments > 0).length;
+  const hr = data.filter(d => (d.ready_qty||0) > 0).length;
+  // 无在途：既无 IN_TRANSIT/SHIPPED，也无 READY_TO_SHIP
+  const nt = data.filter(d => d.total_transit_shipments <= 0 && (d.ready_qty||0) <= 0).length;
+  function cls(k) { return filterUrgency === k ? ' active' : ''; }
+  document.getElementById('stats-bar').innerHTML =
+    `<div class="stat-card red${cls('urgent')}" onclick="toggleFilter('urgent')"><div class="num">${urgent}</div><div class="lbl">极度紧急（≤5天）</div></div>`+
+    `<div class="stat-card orange${cls('warning')}" onclick="toggleFilter('warning')"><div class="num">${warning}</div><div class="lbl">紧急（6~10天）</div></div>`+
+    `<div class="stat-card yellow${cls('caution')}" onclick="toggleFilter('caution')"><div class="num">${caution}</div><div class="lbl">需关注（≤15天）</div></div>`+
+    `<div class="stat-card purple${cls('gap')}" onclick="toggleFilter('gap')"><div class="num">${gap}</div><div class="lbl">⚡衔接不上</div></div>`+
+    `<div class="stat-card blue${cls('all')}" onclick="toggleFilter('all')"><div class="num">${total}</div><div class="lbl">告警 SKU 总数</div></div>`+
+    `<div class="stat-card green${cls('hasTransit')}" onclick="toggleFilter('hasTransit')"><div class="num">${ht}</div><div class="lbl">有在途货件</div></div>`+
+    `<div class="stat-card green${cls('hasReady')}" onclick="toggleFilter('hasReady')"><div class="num">${hr}</div><div class="lbl">即将发货（Ready）</div></div>`+
+    `<div class="stat-card red${cls('noTransit')}" onclick="toggleFilter('noTransit')"><div class="num">${nt}</div><div class="lbl">无在途货件⚠️</div></div>`;
+}
+function toggleFilter(key) {
+  if (filterUrgency === key) filterUrgency = '';
+  else if (key === 'all') { filterUrgency = ''; document.getElementById('store-filter').value = ''; document.getElementById('search-input').value = ''; }
+  else filterUrgency = key;
+  applyFilter();
+}
+
+function applyFilter() {
+  const q = document.getElementById('search-input').value.trim().toLowerCase();
+  const store = document.getElementById('store-filter').value;
+  let data = RAW_DATA.alert_skus.filter(d => {
+    if (store && d.store !== store) return false;
+    if (q && !d.sku.toLowerCase().includes(q) && !d.store.toLowerCase().includes(q) && !d.staff.toLowerCase().includes(q)) return false;
+    if (filterUrgency === 'urgent' && urgencyLevel(d) !== 'urgent') return false;
+    if (filterUrgency === 'warning' && urgencyLevel(d) !== 'warning') return false;
+    if (filterUrgency === 'caution' && urgencyLevel(d) !== 'caution') return false;
+    if (filterUrgency === 'hasTransit' && d.total_transit_shipments <= 0) return false;
+    if (filterUrgency === 'hasReady' && (d.ready_qty||0) <= 0) return false;
+    if (filterUrgency === 'noTransit' && (d.total_transit_shipments > 0 || (d.ready_qty||0) > 0)) return false;
+    if (filterUrgency === 'gap' && !d.gap_flag) return false;
+    return true;
+  });
+  renderStats(data);
+  renderList(sortedData(data));
+}
+function renderList(data) {
+  const c = document.getElementById('sku-list');
+  if (!data.length) { c.innerHTML = '<div class="empty-state"><div class="emoji">🔍</div><div>没有符合条件的 SKU</div></div>'; return; }
+  c.innerHTML = data.map((item, idx) => renderCard(item, idx)).join('');
+}
+function renderCard(item, idx) {
+  const lv = urgencyLevel(item);
+  const ships = item.top3_shipments || [];
+  const ti = item.trend === '上涨' ? '<span class="trend-up">↑上涨</span>' : item.trend === '下降' ? '<span class="trend-down">↓下降</span>' : item.trend;
+  const allBadges = urgencyBadgesHTML(item);
+
+  const sr = ships.map((s,i) => {
+    const da = daysDiff(s.est_arrival);
+    let dl = '';
+    if (da != null) dl = da < 0 ? `(${da}天 ⚠️请确认货件实际情况，并更新)` : `(+${da}天)`;
+    const ac = arrivalClass(s.est_arrival);
+    const sc = `<span class="status-chip status-${s.status}">${s.status === 'IN_TRANSIT' ? '在途' : '已发货'}</span>`;
+    const rc = ['rank-1','rank-2','rank-3'][i] || '';
+    const ls = s.logistics_status ? `<span class="logistics-status-text" title="${s.logistics_status.replace(/"/g,'&quot;')}">${s.logistics_status.replace(/\n/g,' ').length > 40 ? s.logistics_status.replace(/\n/g,' ').slice(0,40)+'…' : s.logistics_status.replace(/\n/g,' ')}</span>` : '<span style="color:#ccc">—</span>';
+    return `<tr><td><span class="rank-badge ${rc}">${i+1}</span>${s.shipment_id}</td><td><strong>${s.qty}</strong> 件</td><td class="arrival-date ${ac}">${s.est_arrival ? s.est_arrival+' '+dl : '<span class="arrival-na">暂无日期</span>'}</td><td>${s.channel || '<span style="color:#ccc">—</span>'}</td><td>${sc}</td><td>${ls}</td></tr>`;
+  }).join('');
+
+  const nm = ships.length === 0 ? '<div class="no-transit">⚠️ 暂无在途/已发货货件，请尽快安排发货</div>' : '';
+
+  return `<div class="sku-card ${lv}" id="card-${idx}">
+    <div class="sku-header" onclick="document.getElementById('card-${idx}').classList.toggle('open')">
+      ${allBadges}
+      <span class="sku-name">${item.sku}</span>
+      <button class="copy-btn" id="copy-${idx}" onclick="event.stopPropagation();copySku('${item.sku.replace(/'/g,"\\'")}','copy-${idx}')">复制</button>
+      <span class="sku-store">${item.store}</span>
+      ${item.staff ? `<span style="font-size:12px;color:var(--muted)">${item.staff}</span>` : ''}
+      ${ti ? `<span style="font-size:12px">${ti}</span>` : ''}
+      <span class="expand-arrow">▼</span>
+    </div>
+    <div class="sku-meta">
+      <div class="meta-item"><div class="meta-lbl">日销（件/天）</div><div class="meta-val">${item.daily_sales}</div></div>
+      <div class="meta-item"><div class="meta-lbl">可售天数（日销）</div><div class="meta-val ${daysClass(item.days_e)}">${item.days_e ?? '—'}</div></div>
+      <div class="meta-item"><div class="meta-lbl">可售天数（7天）</div><div class="meta-val ${daysClass(item.days_f)}">${item.days_f ?? '—'}</div></div>
+      <div class="meta-item"><div class="meta-lbl">FBA 可售</div><div class="meta-val">${item.fba_avail}</div></div>
+      <div class="meta-item"><div class="meta-lbl">预留中</div><div class="meta-val">${item.pending}</div></div>
+      <div class="meta-item"><div class="meta-lbl">在途总量</div><div class="meta-val ${item.total_transit_qty > 0 ? 'ok' : 'danger'}">${item.total_transit_qty || 0}</div></div>
+      <div class="meta-item"><div class="meta-lbl">在途票数</div><div class="meta-val">${item.total_transit_shipments || 0}</div></div>
+      <div class="meta-item"><div class="meta-lbl">接收中数量</div><div class="meta-val ${(item.receiving_qty||0) > 0 ? 'ok' : ''}">${item.receiving_qty || 0}</div></div>
+    </div>
+    <div class="shipment-detail">
+      <div class="detail-title">最快到达货件（前3票）</div>
+      ${ships.length > 0 ? `<table class="shipment-table"><thead><tr><th>货件编号</th><th>在途数量</th><th>预计到达仓库</th><th>渠道</th><th>状态</th><th>物流最新状态</th></tr></thead><tbody>${sr}</tbody></table>` : ''}
+      ${nm}
+      <div class="transit-summary">
+        <div><span>在途总票数：</span><strong>${item.total_transit_shipments}</strong></div>
+        <div><span>在途合计数量：</span><strong>${item.total_transit_qty} 件</strong></div>
+        ${item.total_transit_qty > 0 && item.daily_sales > 0 ? `<div><span>在途可支撑约：</span><strong>${Math.round(item.total_transit_qty/item.daily_sales)} 天销量</strong></div>` : ''}
+      </div>
+      ${renderReceiving(item)}
+      ${renderReady(item)}
+    </div>
+  </div>`;
+}
+function renderReceiving(item) {
+  const rs = item.receiving_shipments || [];
+  if (!rs.length) return '';
+  const rows = rs.map(r => `<tr><td>${r.shipment_id}</td><td><strong>${r.qty}</strong> 件</td><td><span class="status-chip status-RECEIVING">接收中</span></td></tr>`).join('');
+  return `<div class="receiving-section"><div class="detail-title">接收中货件（正在入仓）</div><table class="receiving-table"><thead><tr><th>货件编号</th><th>数量</th><th>状态</th></tr></thead><tbody>${rows}</tbody></table><div class="receiving-summary">接收中合计：<strong>${item.receiving_qty} 件</strong>（${rs.length} 票）</div></div>`;
+}
+function renderReady(item) {
+  const rs = item.ready_shipments || [];
+  if (!rs.length) return '';
+  const rows = rs.map(r => `<tr><td>${r.shipment_id}</td><td><strong>${r.qty}</strong> 件</td><td><span class="status-chip status-READY_TO_SHIP">即将发货</span></td></tr>`).join('');
+  const totalQty = rs.reduce((s,r)=>s+r.qty,0);
+  return `<div class="ready-section"><div class="detail-title">即将发货货件（READY_TO_SHIP）</div><table class="ready-table"><thead><tr><th>货件编号</th><th>数量</th><th>状态</th></tr></thead><tbody>${rows}</tbody></table><div class="ready-summary">即将发货合计：<strong>${totalQty} 件</strong>（${rs.length} 票）</div></div>`;
+}
+function copySku(sku, btnId) {
+  navigator.clipboard.writeText(sku).then(() => {
+    const btn = document.getElementById(btnId);
+    if (!btn) return;
+    btn.textContent = '已复制✓';
+    btn.classList.add('copied');
+    setTimeout(() => { btn.textContent = '复制'; btn.classList.remove('copied'); }, 1500);
+  }).catch(() => {
+    // 兼容无剪贴板权限环境
+    const ta = document.createElement('textarea');
+    ta.value = sku; ta.style.position='fixed'; ta.style.opacity='0';
+    document.body.appendChild(ta); ta.select();
+    try { document.execCommand('copy'); } catch(e) {}
+    document.body.removeChild(ta);
+    const btn = document.getElementById(btnId);
+    if (btn) { btn.textContent = '已复制✓'; btn.classList.add('copied'); setTimeout(()=>{ btn.textContent='复制'; btn.classList.remove('copied'); },1500); }
+  });
+}
+
+function getFilteredData() {
+  const q = document.getElementById('search-input').value.trim().toLowerCase();
+  const store = document.getElementById('store-filter').value;
+  return RAW_DATA.alert_skus.filter(d => {
+    if (store && d.store !== store) return false;
+    if (q && !d.sku.toLowerCase().includes(q) && !d.store.toLowerCase().includes(q) && !d.staff.toLowerCase().includes(q)) return false;
+    if (filterUrgency === 'urgent' && urgencyLevel(d) !== 'urgent') return false;
+    if (filterUrgency === 'warning' && urgencyLevel(d) !== 'warning') return false;
+    if (filterUrgency === 'caution' && urgencyLevel(d) !== 'caution') return false;
+    if (filterUrgency === 'hasTransit' && d.total_transit_shipments <= 0) return false;
+    if (filterUrgency === 'hasReady' && (d.ready_qty||0) <= 0) return false;
+    if (filterUrgency === 'noTransit' && (d.total_transit_shipments > 0 || (d.ready_qty||0) > 0)) return false;
+    if (filterUrgency === 'gap' && !d.gap_flag) return false;
+    return true;
+  });
+}
+function exportCSV() {
+  const data = sortedData(getFilteredData());
+  if (!data.length) { alert('当前没有可导出的数据'); return; }
+  const H = ['紧急程度','SKU','店铺','运营','日销','日销可售天数','7天可售天数','FBA可售','预留中','在途总量','在途票数','接收中数量','最快到达(1)','Qty1','预计到达1','距今天数1','渠道1','状态1','最快到达(2)','Qty2','预计到达2','距今天数2','渠道2','状态2','最快到达(3)','Qty3','预计到达3','距今天数3','渠道3','状态3','接收中(1)','数量(接收1)','接收中(2)','数量(接收2)','接收中(3)','数量(接收3)'];
+  function e(v) { if (v == null) return ''; const s = String(v); return s.includes(',')||s.includes('"')||s.includes('\n') ? '"'+s.replace(/"/g,'""')+'"' : s; }
+  const rows = data.map(d => {
+    const lv = urgencyLevel(d), lb = urgencyLabel(lv)[0].replace(/[^\u4e00-\u9fa5]/g,'');
+    const s = d.top3_shipments || [], r = d.receiving_shipments || [];
+    const p = i => i < s.length ? [s[i].shipment_id, s[i].qty, s[i].est_arrival||'', daysDiff(s[i].est_arrival), s[i].channel||'', s[i].status||''] : ['','','','','',''];
+    const pr = i => i < r.length ? [r[i].shipment_id, r[i].qty] : ['',''];
+    const [p0,p1,p2] = [p(0),p(1),p(2)], [r0,r1,r2] = [pr(0),pr(1),pr(2)];
+    return [lb, e(d.sku), e(d.store), e(d.staff), d.daily_sales, d.days_e??'', d.days_f??'', d.fba_avail, d.pending, d.total_transit_qty, d.total_transit_shipments, d.receiving_qty||0, e(p0[0]), p0[1], p0[2], p0[3]??'', e(p0[4]), p0[5], e(p1[0]), p1[1], p1[2], p1[3]??'', e(p1[4]), p1[5], e(p2[0]), p2[1], p2[2], p2[3]??'', e(p2[4]), p2[5], e(r0[0]), r0[1], e(r1[0]), r1[1], e(r2[0]), r2[1]];
+  });
+  const csv = '\uFEFF' + H.join(',') + '\n' + rows.map(r => r.join(',')).join('\n');
+  const b = new Blob([csv],{type:'text/csv;charset=utf-8'});
+  const u = URL.createObjectURL(b);
+  const a = document.createElement('a'); a.href = u; a.download = 'FBA_备货预警_'+TODAY_STR+'.csv'; a.click();
+  URL.revokeObjectURL(u);
+}
+document.getElementById('today-date').textContent = '数据日期：' + TODAY_STR;
+window.onload = () => { initStores(); applyFilter(); setTimeout(() => { [0,1,2].forEach(i => { const c = document.getElementById('card-'+i); if (c) c.classList.add('open'); }); }, 100); };
+</script>
+</body>
+</html>
