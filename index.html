@@ -428,7 +428,10 @@ function exportCSV() {
   const H = ['紧急程度','SKU','店铺','运营','日销','日销可售天数','7天可售天数','FBA可售','预留中','在途总量','在途票数','接收中数量','最快到达(1)','Qty1','预计到达1','距今天数1','渠道1','状态1','最快到达(2)','Qty2','预计到达2','距今天数2','渠道2','状态2','最快到达(3)','Qty3','预计到达3','距今天数3','渠道3','状态3','接收中(1)','数量(接收1)','接收中(2)','数量(接收2)','接收中(3)','数量(接收3)'];
   function e(v) { if (v == null) return ''; const s = String(v); return s.includes(',')||s.includes('"')||s.includes('\n') ? '"'+s.replace(/"/g,'""')+'"' : s; }
   const rows = data.map(d => {
-    const lv = urgencyLevel(d), lb = urgencyLabel(lv)[0].replace(/[^\u4e00-\u9fa5]/g,'');
+    const lv = urgencyLevel(d);
+    const lbMap = {urgent:'极度紧急', warning:'紧急', caution:'需关注'};
+    let lb = lbMap[lv] || '';
+    if (d.gap_flag) lb += lb ? '/衔接不上' : '衔接不上';
     const s = d.top3_shipments || [], r = d.receiving_shipments || [];
     const p = i => i < s.length ? [s[i].shipment_id, s[i].qty, s[i].est_arrival||'', daysDiff(s[i].est_arrival), s[i].channel||'', s[i].status||''] : ['','','','','',''];
     const pr = i => i < r.length ? [r[i].shipment_id, r[i].qty] : ['',''];
