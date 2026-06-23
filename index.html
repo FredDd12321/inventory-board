@@ -512,5 +512,14 @@ function exportCSV() {
 document.getElementById('today-date').textContent = '数据日期：' + TODAY_STR;
 window.onload = () => { initStores(); filterUrgency = { allsku: true, warning: false, gap: false, noTransit: false }; applyFilter(); setTimeout(() => { [0,1,2].forEach(i => { const c = document.getElementById('card-'+i); if (c) c.classList.add('open'); }); }, 100); };
 </script>
+<script>
+var _hmt = _hmt || [];
+(function() {
+  var hm = document.createElement("script");
+  hm.src = "https://hm.baidu.com/hm.js?c4b646f42701f9c2eabc46d37097bcac";
+  var s = document.getElementsByTagName("script")[0]; 
+  s.parentNode.insertBefore(hm, s);
+})();
+</script> 
 </body>
 </html>
